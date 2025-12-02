@@ -1,0 +1,32 @@
+# YANTECH Client App Dependencies
+# Version ranges allow patch updates while maintaining compatibility
+# Generated for FastAPI ecosystem (Late 2023/Early 2024)
+
+# FastAPI Framework - Stable release with good performance
+fastapi>=0.104.0,<0.105.0
+
+# ASGI Server - Compatible with FastAPI 0.104.x
+uvicorn[standard]>=0.24.0,<0.25.0
+
+# Data Validation - FastAPI 0.104+ requires Pydantic v2
+pydantic>=2.5.0,<3.0.0
+
+# AWS SDK - Recent version with latest service support
+boto3>=1.34.0
+
+# Environment Variables - Stable major release
+python-dotenv>=1.0.0
+
+# Email Validation - Compatible with Pydantic v2
+email-validator>=2.1.0
+
+# JWT Token Generation - For /auth endpoint
+PyJWT>=2.8.0
+
+# X-Ray tracing
+aws-xray-sdk>=2.12.0
+
+# Alternative: Generate from working environment
+# pip freeze > requirements.txt
+# Or use pip-tools: pip-compile requirements.in
+

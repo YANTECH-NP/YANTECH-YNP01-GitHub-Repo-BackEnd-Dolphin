@@ -1,0 +1,15 @@
+# YANTECH Worker App Dependencies
+# Background service for processing SQS messages and sending notifications
+# No web framework needed - pure Python worker
+
+# AWS SDK - Recent version with latest service support
+boto3>=1.34.0
+
+# Environment Variables - Stable major release
+python-dotenv>=1.0.0
+
+# Alternative: Generate from working environment
+# pip freeze > requirements.txt
+# Or use pip-tools: pip-compile requirements.in
+
+

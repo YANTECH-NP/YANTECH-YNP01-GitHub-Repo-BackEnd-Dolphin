@@ -1,0 +1,71 @@
+version: 2
+updates:
+  # Python dependencies - Admin service
+  - package-ecosystem: "pip"
+    directory: "/Backend/admin"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "chiella01"
+    labels:
+      - "dependencies"
+      - "security"
+
+  # Python dependencies - Requestor service
+  - package-ecosystem: "pip"
+    directory: "/Backend/requestor"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "chiella01"
+    labels:
+      - "dependencies"
+      - "security"
+
+  # Python dependencies - Worker service
+  - package-ecosystem: "pip"
+    directory: "/Backend/worker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "chiella01"
+    labels:
+      - "dependencies"
+      - "security"
+
+  # Node.js dependencies - Frontend
+  - package-ecosystem: "npm"
+    directory: "/Frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "chiella01"
+    labels:
+      - "dependencies"
+      - "security"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "chiella01"
+    labels:
+      - "dependencies"
+      - "github-actions"
