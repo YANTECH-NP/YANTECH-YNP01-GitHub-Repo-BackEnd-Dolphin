@@ -13,7 +13,7 @@ on:
   #       - staging
   #       - prod
   # push:
-  #   branches: [staging, develop]
+  #   branches: [staging, dev]
   #   paths: ['Backend/**']
   #   tags: ['v*.*.*']
 
@@ -60,7 +60,7 @@ jobs:
               echo "ENVIRONMENT=staging" >> $GITHUB_ENV
               echo "IMAGE_TAG=$SHORT_SHA-staging-$TIMESTAMP" >> $GITHUB_ENV
               ;;
-            "develop")
+            "dev")
               echo "ENVIRONMENT=dev" >> $GITHUB_ENV
               echo "IMAGE_TAG=$SHORT_SHA-dev-$TIMESTAMP" >> $GITHUB_ENV
               ;;

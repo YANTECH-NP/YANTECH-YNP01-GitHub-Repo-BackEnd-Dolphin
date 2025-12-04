@@ -1,0 +1,169 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [main, dev, staging]
+    paths:
+      - 'admin/**'
+      - 'requestor/**'
+      - 'worker/**'
+      - 'tests/**'
+      - 'pytest.ini'
+      - '.github/workflows/test-suite.yml'
+  pull_request:
+    branches: [main, dev, staging]
+    paths:
+      - 'admin/**'
+      - 'requestor/**'
+      - 'worker/**'
+      - 'tests/**'
+      - 'pytest.ini'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+        service: ['admin', 'requestor', 'worker']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.service }}-${{ hashFiles(format('{0}/requirements.txt', matrix.service)) }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.service }}-
+          ${{ runner.os }}-pip-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r ${{ matrix.service }}/requirements.txt
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/${{ matrix.service }}/ -v --tb=short --cov=${{ matrix.service }}/app --cov-report=xml --cov-report=term-missing -m "unit"
+    
+    - name: Run regression tests
+      run: |
+        pytest tests/${{ matrix.service }}/ -v --tb=short -m "regression"
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: ${{ matrix.service }}
+        name: ${{ matrix.service }}-coverage
+        fail_ci_if_error: false
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install all dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r admin/requirements.txt
+        pip install -r requestor/requirements.txt
+        pip install -r worker/requirements.txt
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/integration/ -v --tb=short -m "integration"
+    
+    - name: Run slow tests
+      if: github.event_name != 'pull_request'
+      run: |
+        pytest tests/ -v --tb=short -m "slow"
+
+  security-tests:
+    runs-on: ubuntu-latest
+    needs: test
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install security tools
+      run: |
+        pip install bandit safety
+    
+    - name: Run Bandit security scan
+      run: |
+        bandit -r admin/ requestor/ worker/ -f json -o bandit-report.json || true
+    
+    - name: Run Safety dependency check
+      run: |
+        safety check --json --output safety-report.json || true
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+        retention-days: 30
+
+  test-summary:
+    runs-on: ubuntu-latest
+    needs: [test, integration-tests, security-tests]
+    if: always()
+    
+    steps:
+    - name: Generate test summary
+      run: |
+        echo "## 🧪 Test Suite Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ "${{ needs.test.result }}" == "success" ]; then
+          echo "✅ **Unit & Regression Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Unit & Regression Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.integration-tests.result }}" == "success" ]; then
+          echo "✅ **Integration Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Integration Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [ "${{ needs.security-tests.result }}" == "success" ]; then
+          echo "✅ **Security Tests**: Passed" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Security Tests**: Failed" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "📊 **Coverage Reports**: Available in job artifacts" >> $GITHUB_STEP_SUMMARY
+        echo "🔒 **Security Reports**: Available in job artifacts" >> $GITHUB_STEP_SUMMARY
