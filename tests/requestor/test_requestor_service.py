@@ -79,7 +79,15 @@ def test_notification_request_format_consistency(mock_send_message, client):
         "OutputType": "EMAIL",
         "Subject": "Test",
         "Message": "Test message",
-        "EmailAddresses": ["test@example.com"]
+        "EmailAddresses": ["test@example.com"],
+        "Recipient": "test@example.com",
+        "Interval": {
+            "Once": True,
+            "Days": [],
+            "Weeks": [],
+            "Months": [],
+            "Years": []
+        }
     }
     
     response = client.post("/notifications", json=notification)
