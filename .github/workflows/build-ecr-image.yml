@@ -2,20 +2,20 @@ name: Deploy Notifications Platform
 
 # Trigger on branch pushes (non-prod) and version tags (prod only)
 on:
-  # workflow_dispatch:
-  #   inputs:
-  #     environment:
-  #       description: 'Target environment'
-  #       required: true
-  #       type: choice
-  #       options:
-  #       - dev
-  #       - staging
-  #       - prod
-  # push:
-  #   branches: [staging, dev]
-  #   paths: ['Backend/**']
-  #   tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+  push:
+    branches: [staging, dev]
+    paths: ['Backend/**']
+    tags: ['v*.*.*']
 
 permissions:
   id-token: write    # Required for OIDC authentication

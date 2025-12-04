@@ -55,12 +55,23 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r ${{ matrix.service }}/requirements.txt
+        pip install pytest pytest-cov pytest-asyncio faker moto[all]
     
     - name: Run unit tests
+      env:
+        TESTING: true
+        AWS_ACCESS_KEY_ID: testing
+        AWS_SECRET_ACCESS_KEY: testing
+        AWS_REGION: us-east-1
       run: |
         pytest tests/${{ matrix.service }}/ -v --tb=short --cov=${{ matrix.service }}/app --cov-report=xml --cov-report=term-missing -m "unit"
     
     - name: Run regression tests
+      env:
+        TESTING: true
+        AWS_ACCESS_KEY_ID: testing
+        AWS_SECRET_ACCESS_KEY: testing
+        AWS_REGION: us-east-1
       run: |
         pytest tests/${{ matrix.service }}/ -v --tb=short -m "regression"
     
@@ -91,8 +102,14 @@ jobs:
         pip install -r admin/requirements.txt
         pip install -r requestor/requirements.txt
         pip install -r worker/requirements.txt
+        pip install pytest pytest-cov pytest-asyncio faker moto[all]
     
     - name: Run integration tests
+      env:
+        TESTING: true
+        AWS_ACCESS_KEY_ID: testing
+        AWS_SECRET_ACCESS_KEY: testing
+        AWS_REGION: us-east-1
       run: |
         pytest tests/integration/ -v --tb=short -m "integration"
     
