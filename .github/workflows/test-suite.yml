@@ -63,6 +63,7 @@ jobs:
         AWS_ACCESS_KEY_ID: testing
         AWS_SECRET_ACCESS_KEY: testing
         AWS_REGION: us-east-1
+        PYTHONPATH: ${{ github.workspace }}
       run: |
         pytest tests/${{ matrix.service }}/ -v --tb=short --cov=${{ matrix.service }}/app --cov-report=xml --cov-report=term-missing -m "unit"
     
@@ -72,6 +73,7 @@ jobs:
         AWS_ACCESS_KEY_ID: testing
         AWS_SECRET_ACCESS_KEY: testing
         AWS_REGION: us-east-1
+        PYTHONPATH: ${{ github.workspace }}
       run: |
         pytest tests/${{ matrix.service }}/ -v --tb=short -m "regression"
     
@@ -110,6 +112,7 @@ jobs:
         AWS_ACCESS_KEY_ID: testing
         AWS_SECRET_ACCESS_KEY: testing
         AWS_REGION: us-east-1
+        PYTHONPATH: ${{ github.workspace }}
       run: |
         pytest tests/integration/ -v --tb=short -m "integration"
     
