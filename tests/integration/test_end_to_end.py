@@ -127,3 +127,79 @@ def test_database_operations(aws_mocks):
     # Verify deletion
     response = table.get_item(Key={"id": "test-1"})
     assert "Item" not in response
+
+@pytest.mark.slow
+@pytest.mark.integration
+def test_comprehensive_system_workflow(aws_mocks):
+    """Slow test: Comprehensive system workflow with multiple operations."""
+    import time
+    
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    
+    # Use existing tables from aws_mocks fixture
+    applications_table = dynamodb.Table("test-applications")
+    api_keys_table = dynamodb.Table("test-api-keys")
+    
+    # Create SQS queue
+    queue_response = sqs.create_queue(QueueName="slow-test-queue")
+    queue_url = queue_response["QueueUrl"]
+    
+    # Simulate slow operations with multiple applications
+    for i in range(5):
+        app_id = f"slow-test-app-{i:03d}"
+        
+        # Create application
+        applications_table.put_item(Item={
+            "id": app_id,
+            "name": f"Slow Test Application {i}",
+            "application_id": f"slow.test.app.{i}",
+            "email": f"admin{i}@slowtest.app",
+            "domain": f"slowtest{i}.app",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        })
+        
+        # Create multiple API keys per application
+        for j in range(3):
+            api_keys_table.put_item(Item={
+                "app_id": app_id,
+                "id": f"key-{i}-{j}",
+                "key_hash": f"slow-test-hash-{i}-{j}",
+                "name": f"Slow Test API Key {i}-{j}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "is_active": True
+            })
+        
+        # Send multiple notifications
+        for k in range(2):
+            notification = {
+                "Application": app_id,
+                "OutputType": "EMAIL",
+                "Subject": f"Slow Test Notification {i}-{k}",
+                "Message": f"This is slow test notification {i}-{k}",
+                "EmailAddresses": [f"recipient{i}-{k}@slowtest.app"]
+            }
+            
+            sqs.send_message(
+                QueueUrl=queue_url,
+                MessageBody=json.dumps(notification)
+            )
+        
+        # Simulate processing delay
+        time.sleep(0.1)
+    
+    # Verify all applications were created
+    scan_response = applications_table.scan()
+    slow_test_apps = [item for item in scan_response['Items'] if item['id'].startswith('slow-test-app')]
+    assert len(slow_test_apps) == 5
+    
+    # Verify all API keys were created
+    scan_response = api_keys_table.scan()
+    slow_test_keys = [item for item in scan_response['Items'] if item['app_id'].startswith('slow-test-app')]
+    assert len(slow_test_keys) == 15  # 5 apps * 3 keys each
+    
+    # Verify all messages were queued
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)
+    assert "Messages" in messages
+    assert len(messages["Messages"]) == 10  # 5 apps * 2 notifications each
