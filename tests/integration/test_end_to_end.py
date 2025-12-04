@@ -5,8 +5,7 @@ from moto import mock_aws
 import boto3
 
 @pytest.mark.integration
-@mock_aws
-def test_complete_notification_flow(aws_credentials):
+def test_complete_notification_flow(aws_mocks):
     """Test complete flow: Create app -> Generate API key -> Send notification."""
     
     # Setup AWS mocks
@@ -15,26 +14,9 @@ def test_complete_notification_flow(aws_credentials):
     sns = boto3.client("sns", region_name="us-east-1")
     ses = boto3.client("ses", region_name="us-east-1")
     
-    # Create DynamoDB tables
-    applications_table = dynamodb.create_table(
-        TableName="test-applications",
-        KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
-        AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
-        BillingMode="PAY_PER_REQUEST"
-    )
-    
-    api_keys_table = dynamodb.create_table(
-        TableName="test-api-keys",
-        KeySchema=[
-            {"AttributeName": "app_id", "KeyType": "HASH"},
-            {"AttributeName": "id", "KeyType": "RANGE"}
-        ],
-        AttributeDefinitions=[
-            {"AttributeName": "app_id", "AttributeType": "S"},
-            {"AttributeName": "id", "AttributeType": "S"}
-        ],
-        BillingMode="PAY_PER_REQUEST"
-    )
+    # Use existing DynamoDB tables from aws_mocks fixture
+    applications_table = dynamodb.Table("test-applications")
+    api_keys_table = dynamodb.Table("test-api-keys")
     
     # Create SQS queue
     queue_response = sqs.create_queue(QueueName="test-queue")
@@ -105,15 +87,14 @@ def test_complete_notification_flow(aws_credentials):
     assert app_response["Item"]["name"] == "Test Application"
 
 @pytest.mark.integration
-@mock_aws
-def test_database_operations(aws_credentials):
+def test_database_operations(aws_mocks):
     """Test DynamoDB operations work correctly."""
     
     dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
     
-    # Create table
+    # Create a separate test table for this test
     table = dynamodb.create_table(
-        TableName="test-table",
+        TableName="integration-test-table",
         KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
         AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
         BillingMode="PAY_PER_REQUEST"
