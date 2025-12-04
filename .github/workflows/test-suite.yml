@@ -55,7 +55,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r ${{ matrix.service }}/requirements.txt
-        pip install pytest pytest-cov pytest-asyncio faker moto[all] fastapi httpx
+        pip install pytest pytest-cov pytest-asyncio faker moto[all] 'fastapi==0.104.1' 'starlette==0.27.0' 'httpx==0.24.1'
     
     - name: Run unit tests
       env:
@@ -104,7 +104,7 @@ jobs:
         pip install -r admin/requirements.txt
         pip install -r requestor/requirements.txt
         pip install -r worker/requirements.txt
-        pip install pytest pytest-cov pytest-asyncio faker moto[all] fastapi httpx
+        pip install pytest pytest-cov pytest-asyncio faker moto[all] 'fastapi==0.104.1' 'starlette==0.27.0' 'httpx==0.24.1'
     
     - name: Run integration tests
       env:
