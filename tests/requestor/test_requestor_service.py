@@ -50,8 +50,13 @@ def test_notifications_endpoint(mock_send_message, client, sample_notification):
     assert data["status"] == "queued"
     assert "processing_time_ms" in data
     
-    # Verify SQS was called
-    mock_send_message.assert_called_once_with(sample_notification)
+    # Verify SQS was called with correct data
+    mock_send_message.assert_called_once()
+    called_args = mock_send_message.call_args[0][0]
+    assert called_args["Application"] == sample_notification["Application"]
+    assert called_args["OutputType"] == sample_notification["OutputType"]
+    assert called_args["Subject"] == sample_notification["Subject"]
+    assert called_args["Message"] == sample_notification["Message"]
 
 @pytest.mark.unit
 def test_auth_endpoint(client):

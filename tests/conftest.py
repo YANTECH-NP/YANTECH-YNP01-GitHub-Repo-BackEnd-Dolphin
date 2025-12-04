@@ -80,5 +80,12 @@ def sample_notification():
         "Subject": fake.sentence(),
         "Message": fake.text(),
         "EmailAddresses": [fake.email()],
-        "Recipient": fake.email()
+        "Recipient": fake.email(),
+        "Interval": {
+            "Once": True,
+            "Days": [],
+            "Weeks": [],
+            "Months": [],
+            "Years": []
+        }
     }
