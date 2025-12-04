@@ -100,5 +100,7 @@ def test_notifications_error_handling(mock_send_message, client, sample_notifica
 @pytest.mark.unit
 def test_cors_headers(client):
     """Test CORS middleware is configured."""
-    response = client.get("/health")
-    assert response.status_code == 200
+    with patch('requestor.app.main.app_state') as mock_state:
+        mock_state.ready = True
+        response = client.get("/health")
+        assert response.status_code == 200
