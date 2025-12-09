@@ -2,20 +2,20 @@ name: Deploy Notifications Platform
 
 # Trigger on branch pushes (non-prod) and version tags (prod only)
 on:
-  # workflow_dispatch:
-  #   inputs:
-  #     environment:
-  #       description: 'Target environment'
-  #       required: true
-  #       type: choice
-  #       options:
-  #       - dev
-  #       - staging
-  #       - prod
-  # push:
-  #   branches: [staging, develop]
-  #   paths: ['Backend/**']
-  #   tags: ['v*.*.*']
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+        - dev
+        - staging
+        - prod
+  push:
+    branches: [staging, dev]
+    paths: ['admin/**', 'requestor/**', 'worker/**']
+    tags: ['v*.*.*']
 
 permissions:
   id-token: write    # Required for OIDC authentication
@@ -60,7 +60,7 @@ jobs:
               echo "ENVIRONMENT=staging" >> $GITHUB_ENV
               echo "IMAGE_TAG=$SHORT_SHA-staging-$TIMESTAMP" >> $GITHUB_ENV
               ;;
-            "develop")
+            "dev")
               echo "ENVIRONMENT=dev" >> $GITHUB_ENV
               echo "IMAGE_TAG=$SHORT_SHA-dev-$TIMESTAMP" >> $GITHUB_ENV
               ;;
@@ -111,7 +111,7 @@ jobs:
           if [[ "$IS_RELEASE" == "true" ]]; then
             # Production release: tag with version only (semantic versioning)
             docker build -t $ECR_REGISTRY/$SERVICE-prod:$VERSION_TAG \
-                        ./Backend/$SERVICE
+                        ./$SERVICE
             
             docker push $ECR_REGISTRY/$SERVICE-prod:$VERSION_TAG
             
@@ -119,7 +119,7 @@ jobs:
           else
             # Branch deployment: tag with commit-sha-environment-timestamp
             docker build -t $ECR_REGISTRY/$SERVICE-$ENVIRONMENT:$IMAGE_TAG \
-                        ./Backend/$SERVICE
+                        ./$SERVICE
             
             docker push $ECR_REGISTRY/$SERVICE-$ENVIRONMENT:$IMAGE_TAG
             

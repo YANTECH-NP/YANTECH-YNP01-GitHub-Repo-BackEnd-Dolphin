@@ -1,0 +1,205 @@
+"""Integration tests for the complete notification flow."""
+import pytest
+import json
+from moto import mock_aws
+import boto3
+
+@pytest.mark.integration
+def test_complete_notification_flow(aws_mocks):
+    """Test complete flow: Create app -> Generate API key -> Send notification."""
+    
+    # Setup AWS mocks
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    sns = boto3.client("sns", region_name="us-east-1")
+    ses = boto3.client("ses", region_name="us-east-1")
+    
+    # Use existing DynamoDB tables from aws_mocks fixture
+    applications_table = dynamodb.Table("test-applications")
+    api_keys_table = dynamodb.Table("test-api-keys")
+    
+    # Create SQS queue
+    queue_response = sqs.create_queue(QueueName="test-queue")
+    queue_url = queue_response["QueueUrl"]
+    
+    # Create SNS topic
+    topic_response = sns.create_topic(Name="test-notifications")
+    topic_arn = topic_response["TopicArn"]
+    
+    # Verify SES identity
+    ses.verify_email_identity(EmailAddress="test@example.com")
+    
+    # Test data
+    app_data = {
+        "App_name": "Test Application",
+        "Application": "test.app",
+        "Email": "admin@test.app",
+        "Domain": "test.app"
+    }
+    
+    # 1. Create application (simulate admin service)
+    applications_table.put_item(Item={
+        "id": "test-app-001",
+        "name": app_data["App_name"],
+        "application_id": app_data["Application"],
+        "email": app_data["Email"],
+        "domain": app_data["Domain"],
+        "created_at": "2024-01-01T00:00:00Z",
+        "updated_at": "2024-01-01T00:00:00Z"
+    })
+    
+    # 2. Generate API key (simulate admin service)
+    api_keys_table.put_item(Item={
+        "app_id": "test-app-001",
+        "id": "key-001",
+        "key_hash": "test-hash",
+        "name": "Test API Key",
+        "created_at": "2024-01-01T00:00:00Z",
+        "is_active": True
+    })
+    
+    # 3. Send notification to queue (simulate requestor service)
+    notification = {
+        "Application": "test-app-001",
+        "OutputType": "EMAIL",
+        "Subject": "Test Notification",
+        "Message": "This is a test notification",
+        "EmailAddresses": ["recipient@example.com"]
+    }
+    
+    sqs.send_message(
+        QueueUrl=queue_url,
+        MessageBody=json.dumps(notification)
+    )
+    
+    # 4. Verify message in queue
+    messages = sqs.receive_message(QueueUrl=queue_url)
+    assert "Messages" in messages
+    assert len(messages["Messages"]) == 1
+    
+    received_message = json.loads(messages["Messages"][0]["Body"])
+    assert received_message["Application"] == "test-app-001"
+    assert received_message["OutputType"] == "EMAIL"
+    
+    # 5. Verify application exists in database
+    app_response = applications_table.get_item(Key={"id": "test-app-001"})
+    assert "Item" in app_response
+    assert app_response["Item"]["name"] == "Test Application"
+
+@pytest.mark.integration
+def test_database_operations(aws_mocks):
+    """Test DynamoDB operations work correctly."""
+    
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+    
+    # Create a separate test table for this test
+    table = dynamodb.create_table(
+        TableName="integration-test-table",
+        KeySchema=[{"AttributeName": "id", "KeyType": "HASH"}],
+        AttributeDefinitions=[{"AttributeName": "id", "AttributeType": "S"}],
+        BillingMode="PAY_PER_REQUEST"
+    )
+    
+    # Test CRUD operations
+    # Create
+    table.put_item(Item={"id": "test-1", "name": "Test Item"})
+    
+    # Read
+    response = table.get_item(Key={"id": "test-1"})
+    assert "Item" in response
+    assert response["Item"]["name"] == "Test Item"
+    
+    # Update
+    table.update_item(
+        Key={"id": "test-1"},
+        UpdateExpression="SET #name = :name",
+        ExpressionAttributeNames={"#name": "name"},
+        ExpressionAttributeValues={":name": "Updated Item"}
+    )
+    
+    # Verify update
+    response = table.get_item(Key={"id": "test-1"})
+    assert response["Item"]["name"] == "Updated Item"
+    
+    # Delete
+    table.delete_item(Key={"id": "test-1"})
+    
+    # Verify deletion
+    response = table.get_item(Key={"id": "test-1"})
+    assert "Item" not in response
+
+@pytest.mark.slow
+@pytest.mark.integration
+def test_comprehensive_system_workflow(aws_mocks):
+    """Slow test: Comprehensive system workflow with multiple operations."""
+    import time
+    
+    dynamodb = boto3.resource("dynamodb", region_name="us-east-1")
+    sqs = boto3.client("sqs", region_name="us-east-1")
+    
+    # Use existing tables from aws_mocks fixture
+    applications_table = dynamodb.Table("test-applications")
+    api_keys_table = dynamodb.Table("test-api-keys")
+    
+    # Create SQS queue
+    queue_response = sqs.create_queue(QueueName="slow-test-queue")
+    queue_url = queue_response["QueueUrl"]
+    
+    # Simulate slow operations with multiple applications
+    for i in range(5):
+        app_id = f"slow-test-app-{i:03d}"
+        
+        # Create application
+        applications_table.put_item(Item={
+            "id": app_id,
+            "name": f"Slow Test Application {i}",
+            "application_id": f"slow.test.app.{i}",
+            "email": f"admin{i}@slowtest.app",
+            "domain": f"slowtest{i}.app",
+            "created_at": "2024-01-01T00:00:00Z",
+            "updated_at": "2024-01-01T00:00:00Z"
+        })
+        
+        # Create multiple API keys per application
+        for j in range(3):
+            api_keys_table.put_item(Item={
+                "app_id": app_id,
+                "id": f"key-{i}-{j}",
+                "key_hash": f"slow-test-hash-{i}-{j}",
+                "name": f"Slow Test API Key {i}-{j}",
+                "created_at": "2024-01-01T00:00:00Z",
+                "is_active": True
+            })
+        
+        # Send multiple notifications
+        for k in range(2):
+            notification = {
+                "Application": app_id,
+                "OutputType": "EMAIL",
+                "Subject": f"Slow Test Notification {i}-{k}",
+                "Message": f"This is slow test notification {i}-{k}",
+                "EmailAddresses": [f"recipient{i}-{k}@slowtest.app"]
+            }
+            
+            sqs.send_message(
+                QueueUrl=queue_url,
+                MessageBody=json.dumps(notification)
+            )
+        
+        # Simulate processing delay
+        time.sleep(0.1)
+    
+    # Verify all applications were created
+    scan_response = applications_table.scan()
+    slow_test_apps = [item for item in scan_response['Items'] if item['id'].startswith('slow-test-app')]
+    assert len(slow_test_apps) == 5
+    
+    # Verify all API keys were created
+    scan_response = api_keys_table.scan()
+    slow_test_keys = [item for item in scan_response['Items'] if item['app_id'].startswith('slow-test-app')]
+    assert len(slow_test_keys) == 15  # 5 apps * 3 keys each
+    
+    # Verify all messages were queued
+    messages = sqs.receive_message(QueueUrl=queue_url, MaxNumberOfMessages=10)
+    assert "Messages" in messages
+    assert len(messages["Messages"]) == 10  # 5 apps * 2 notifications each

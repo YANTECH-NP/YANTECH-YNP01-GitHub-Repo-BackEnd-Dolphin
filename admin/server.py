@@ -16,6 +16,11 @@ import uuid
 import boto3
 from botocore.exceptions import ClientError
 
+# # Testing mode setup
+# if os.getenv("TESTING") == "true":
+#     from moto import mock_dynamodb
+#     mock_dynamodb().start()
+
 # Environment Configuration
 ALLOWED_ORIGINS = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 # If ALLOWED_ORIGINS is "*", convert to list for CORS middleware
@@ -33,7 +38,7 @@ API_KEYS_TABLE = os.getenv("API_KEYS_TABLE", "YANTECH-YNP01-AWS-DYNAMODB-API-KEY
 
 # Initialize DynamoDB resource
 dynamodb_config = {"region_name": AWS_REGION}
-if DYNAMODB_ENDPOINT:
+if DYNAMODB_ENDPOINT and os.getenv("TESTING") != "true":
     dynamodb_config["endpoint_url"] = DYNAMODB_ENDPOINT
 
 dynamodb = boto3.resource("dynamodb", **dynamodb_config)
@@ -145,8 +150,9 @@ def init_dynamodb_tables():
         raise
 
 
-# Initialize tables on startup
-init_dynamodb_tables()
+# Initialize tables on startup (skip in testing)
+if os.getenv("TESTING") != "true":
+    init_dynamodb_tables()
 
 # Pydantic Models
 class ApplicationCreate(BaseModel):
@@ -578,6 +584,6 @@ async def verify_key(x_api_key: str = Header(...)):
     }
 
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+# if __name__ == "__main__":
+#     import uvicorn
+#     uvicorn.run(app, host="0.0.0.0", port=8001)

@@ -5,3 +5,11 @@ python-dotenv
 uvicorn
 python-multipart
 requests
+
+# Testing dependencies
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.24.0
+moto[dynamodb,sqs,sns,ses]>=4.2.0
+faker>=19.0.0
