@@ -1,203 +1,257 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, Field
 from fastapi.middleware.cors import CORSMiddleware
 import secrets
 import string
 from datetime import datetime, timezone
 from typing import Optional, List
-# Removed AWS services import - admin only handles app registration
 from .db import save_app_record, get_all_apps, update_app_record, delete_app_record, save_api_key, get_api_keys_for_app, delete_api_key, get_api_key_by_id
 
-app = FastAPI()
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "*",  # Allow all origins for testing
-        "http://yantech-frontend-admin.s3-website-us-east-1.amazonaws.com",
-        "https://yantech-frontend-admin.s3.amazonaws.com"
-    ],
-    allow_credentials=False,  # Changed to False for S3 website compatibility
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Content-Type", "Authorization", "X-API-Key", "x-api-key"],
+app = FastAPI(
+    title="Application API Key Manager",
+    description="API for managing applications and their API keys",
+    version="1.0.0"
 )
 
-class AppRequest(BaseModel):
-    App_name: str
+# CORS middleware - matches server.py configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=["Content-Type", "Authorization", "X-API-Key", "Accept"],
+    expose_headers=["Content-Type", "X-Total-Count"],
+    max_age=3600,
+)
+
+# Models matching server.py
+class ApplicationCreate(BaseModel):
+    App_name: str = Field(..., min_length=1, max_length=255)
     Application: str
-    Email: EmailStr
+    Email: str
     Domain: str
+
+class ApplicationResponse(BaseModel):
+    id: str
+    name: str
+    application_id: str
+    email: str
+    domain: str
+    created_at: datetime
+    updated_at: datetime
 
 class APIKeyCreate(BaseModel):
     name: Optional[str] = None
-    expires_at: Optional[str] = None
+    expires_at: Optional[datetime] = None
 
 class APIKeyResponse(BaseModel):
     id: str
     api_key: str
     name: Optional[str]
-    created_at: str
-    expires_at: Optional[str]
-    is_active: bool
+    created_at: datetime
+    expires_at: Optional[datetime]
 
 class APIKeyInfo(BaseModel):
     id: str
     name: Optional[str]
-    created_at: str
-    expires_at: Optional[str]
-    last_used_at: Optional[str]
+    created_at: datetime
+    expires_at: Optional[datetime]
+    last_used_at: Optional[datetime]
     is_active: bool
 
-@app.get("/health")
-def health_check():
-    return {"status": "ok", "service": "admin"}
-
-@app.get("/debug/config")  # added debug endpoint"""  """
-def debug_config():
-    """Debug endpoint to check configuration"""
-    from .config import settings
+@app.get("/")
+async def root():
+    """Health check endpoint"""
     return {
-        "API_KEYS_TABLE": settings.API_KEYS_TABLE,
-        "APP_CONFIG_TABLE": settings.APP_CONFIG_TABLE,
-        "AWS_REGION": settings.AWS_REGION
+        "status": "online",
+        "service": "Application API Key Manager",
+        "version": "1.0.0"
     }
 
-@app.options("/{path:path}")
-def options_handler(path: str):
-    """Handle CORS preflight requests"""
-    return {"message": "OK"}
+@app.get("/health")
+async def health_check():
+    """Detailed health check endpoint"""
+    return {
+        "status": "healthy",
+        "service": "Application API Key Manager",
+        "version": "1.0.0",
+        "database": "connected",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 
 
-@app.post("/applications")
-def register_application(app_req: AppRequest):
+@app.post("/app", response_model=ApplicationResponse, status_code=201)
+async def create_application(app_data: ApplicationCreate):
+    """Create a new application"""
     try:
-        # Create application record
+        import uuid
+        
+        # Generate unique ID
+        app_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
+        
+        # Create application record using existing database schema
         app_record = {
-            "Application": app_req.Application,
-            "App_name": app_req.App_name,
-            "Email": app_req.Email,
-            "Domain": app_req.Domain,
-            "role": "client",
-            "Status": "ACTIVE"
+            "Application": app_data.Application,  # Primary key for DynamoDB
+            "App_name": app_data.App_name,
+            "Email": app_data.Email,
+            "Domain": app_data.Domain,
+            "id": app_id,  # Additional UUID for response
+            "name": app_data.App_name,  # For server.py compatibility
+            "application_id": app_data.Application,  # For server.py compatibility
+            "email": app_data.Email,  # For server.py compatibility
+            "domain": app_data.Domain,  # For server.py compatibility
+            "created_at": now.isoformat(),
+            "updated_at": now.isoformat()
         }
         
         save_app_record(app_record)
         
-        # Auto-generate initial API key
-        alphabet = string.ascii_letters + string.digits + "_-"
-        api_key = ''.join(secrets.choice(alphabet) for _ in range(32))
-        
-        api_key_record = {
-            "app_id": app_req.Application,
-            "id": f"key_{secrets.token_hex(8)}",
-            "api_key": api_key,
-            "name": "Default API Key",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": None,
-            "last_used_at": None,
-            "is_active": True
-        }
-        
-        save_api_key(api_key_record)
-        
-        # Return with API key for frontend
-        return {
-            "id": app_req.Application,
-            "status": "created", 
-            "application": app_req.Application,
-            "message": "Application registered successfully",
-            "apiKey": api_key,
-            "apiKeyId": api_key_record["id"]
-        }
+        # Return response matching server.py format
+        return ApplicationResponse(
+            id=app_id,
+            name=app_data.App_name,
+            application_id=app_data.Application,
+            email=app_data.Email,
+            domain=app_data.Domain,
+            created_at=now,
+            updated_at=now
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to create application: {str(e)}")
 
-@app.get("/applications")
-def list_registered_apps():
+@app.get("/apps", response_model=List[ApplicationResponse])
+async def list_applications(skip: int = 0, limit: int = 100):
+    """List all applications"""
     try:
-        return get_all_apps()
+        apps_data = get_all_apps()
+        
+        # Convert to response models matching server.py format
+        apps = []
+        for item in apps_data[skip:skip+limit]:
+            apps.append(ApplicationResponse(
+                id=item.get("id", item.get("Application", "")),
+                name=item.get("name", item.get("App_name", "")),
+                application_id=item.get("application_id", item.get("Application", "")),
+                email=item.get("email", item.get("Email", "")),
+                domain=item.get("domain", item.get("Domain", "")),
+                created_at=datetime.fromisoformat(item.get("created_at", datetime.now(timezone.utc).isoformat())),
+                updated_at=datetime.fromisoformat(item.get("updated_at", datetime.now(timezone.utc).isoformat()))
+            ))
+        
+        return apps
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to list applications: {str(e)}")
 
-# Frontend expects /apps endpoint
-@app.get("/apps")
-def list_apps_frontend():
-    """Frontend-compatible endpoint"""
+@app.get("/app/{app_id}", response_model=ApplicationResponse)
+async def get_application(app_id: str):
+    """Get a specific application"""
     try:
-        return get_all_apps()
+        apps = get_all_apps()
+        app_item = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        
+        if not app_item:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        return ApplicationResponse(
+            id=app_item.get("id", app_item.get("Application", "")),
+            name=app_item.get("name", app_item.get("App_name", "")),
+            application_id=app_item.get("application_id", app_item.get("Application", "")),
+            email=app_item.get("email", app_item.get("Email", "")),
+            domain=app_item.get("domain", app_item.get("Domain", "")),
+            created_at=datetime.fromisoformat(app_item.get("created_at", datetime.now(timezone.utc).isoformat())),
+            updated_at=datetime.fromisoformat(app_item.get("updated_at", datetime.now(timezone.utc).isoformat()))
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to get application: {str(e)}")
 
-@app.post("/app")
-def create_app_frontend(app_req: AppRequest):
-    """Frontend-compatible endpoint"""
-    return register_application(app_req)
-
-@app.put("/applications/{app_id}")
-def update_application(app_id: str, app_req: AppRequest):
+@app.put("/app/{app_id}", response_model=ApplicationResponse)
+async def update_application(app_id: str, app_data: ApplicationCreate):
     """Update an existing application"""
     try:
-        # Create updated application record
+        now = datetime.now(timezone.utc)
+        
+        # Create updated application record matching server.py format
         app_record = {
-            "Application": app_id,
-            "App_name": app_req.App_name,
-            "Email": app_req.Email,
-            "Domain": app_req.Domain,
-            "Status": "ACTIVE"
+            "id": app_id,
+            "name": app_data.App_name,
+            "application_id": app_data.Application,
+            "email": app_data.Email,
+            "domain": app_data.Domain,
+            "updated_at": now.isoformat()
         }
         
         update_app_record(app_id, app_record)
         
-        return {
-            "status": "updated", 
-            "application": app_id,
-            "message": "Application updated successfully"
-        }
+        # Get existing created_at
+        apps = get_all_apps()
+        existing_app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        created_at = datetime.fromisoformat(existing_app.get("created_at", now.isoformat())) if existing_app else now
+        
+        return ApplicationResponse(
+            id=app_id,
+            name=app_data.App_name,
+            application_id=app_data.Application,
+            email=app_data.Email,
+            domain=app_data.Domain,
+            created_at=created_at,
+            updated_at=now
+        )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to update application: {str(e)}")
 
-@app.put("/app/{app_id}")
-def update_app_frontend(app_id: str, app_req: AppRequest):
-    """Frontend-compatible endpoint"""
-    return update_application(app_id, app_req)
-
-@app.delete("/applications/{app_id}")
-def delete_application(app_id: str):
-    """Delete an application"""
+@app.delete("/app/{app_id}", status_code=204)
+async def delete_application(app_id: str):
+    """Delete an application and all its API keys"""
     try:
+        # Delete all API keys for this application
+        try:
+            keys = get_api_keys_for_app(app_id)
+            for key in keys:
+                delete_api_key(app_id, key["id"])
+        except Exception:
+            pass  # Continue even if no keys found
+        
+        # Delete the application
         delete_app_record(app_id)
         
-        return {
-            "status": "deleted",
-            "application": app_id,
-            "message": "Application deleted successfully"
-        }
+        return None
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.delete("/app/{app_id}")
-def delete_app_frontend(app_id: str):
-    """Frontend-compatible endpoint"""
-    return delete_application(app_id)
+        raise HTTPException(status_code=500, detail=f"Failed to delete application: {str(e)}")
 
 # API Key Management Endpoints
 
-@app.post("/app/{app_id}/api-key")
-def create_api_key(app_id: str, key_data: APIKeyCreate):
-    """Create new API key for application"""
+@app.post("/app/{app_id}/api-key", response_model=APIKeyResponse, status_code=201)
+async def generate_api_key(app_id: str, key_data: APIKeyCreate = APIKeyCreate()):
+    """Generate a new API key for an application"""
     try:
-        alphabet = string.ascii_letters + string.digits + "_-"
-        api_key = ''.join(secrets.choice(alphabet) for _ in range(32))
+        import uuid
+        
+        # Verify application exists
+        apps = get_all_apps()
+        app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        # Generate a secure random API key matching server.py format
+        api_key = f"sk_{secrets.token_urlsafe(32)}"
+        key_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc)
         
         api_key_record = {
             "app_id": app_id,
-            "id": f"key_{secrets.token_hex(8)}",
+            "id": key_id,
             "api_key": api_key,
-            "name": key_data.name or "API Key",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "expires_at": key_data.expires_at,
+            "name": key_data.name or f"API Key for {app.get('name', app.get('App_name', 'Application'))}",
+            "created_at": now.isoformat(),
+            "expires_at": key_data.expires_at.isoformat() if key_data.expires_at else None,
             "last_used_at": None,
             "is_active": True
         }
@@ -205,97 +259,59 @@ def create_api_key(app_id: str, key_data: APIKeyCreate):
         save_api_key(api_key_record)
         
         return APIKeyResponse(
-            id=api_key_record["id"],
+            id=key_id,
             api_key=api_key,
             name=api_key_record["name"],
-            created_at=api_key_record["created_at"],
-            expires_at=api_key_record["expires_at"],
-            is_active=True
+            created_at=now,
+            expires_at=key_data.expires_at
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to generate API key: {str(e)}")
 
-@app.get("/app/{app_id}/api-keys")
-def get_application_api_keys(app_id: str) -> List[APIKeyInfo]:
-    """Get all API keys for application"""
+@app.get("/app/{app_id}/api-keys", response_model=List[APIKeyInfo])
+async def list_api_keys(app_id: str):
+    """List all API keys for an application (without showing the actual keys)"""
     try:
+        # Check if application exists
+        apps = get_all_apps()
+        app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        if not app:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
         keys = get_api_keys_for_app(app_id)
         return [
             APIKeyInfo(
                 id=key["id"],
                 name=key.get("name"),
-                created_at=key["created_at"],
-                expires_at=key.get("expires_at"),
-                last_used_at=key.get("last_used_at"),
+                created_at=datetime.fromisoformat(key["created_at"]),
+                expires_at=datetime.fromisoformat(key["expires_at"]) if key.get("expires_at") else None,
+                last_used_at=datetime.fromisoformat(key["last_used_at"]) if key.get("last_used_at") else None,
                 is_active=key.get("is_active", True)
             )
             for key in keys
         ]
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to list API keys: {str(e)}")
 
-@app.delete("/app/{app_id}/api-key/{key_id}")
-def revoke_api_key(app_id: str, key_id: str):
-    """Revoke/delete API key"""
+@app.delete("/app/{app_id}/api-key/{key_id}", status_code=204)
+async def revoke_api_key(app_id: str, key_id: str):
+    """Revoke (deactivate) an API key"""
     try:
-        delete_api_key(app_id, key_id)
-        return {
-            "status": "revoked",
-            "key_id": key_id,
-            "message": "API key revoked successfully"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/app/{app_id}/api-key/{key_id}/value")
-def get_api_key_value(app_id: str, key_id: str):
-    """Get API key value for admin interface - unauthenticated endpoint"""
-    try:
+        # Get the key to verify it exists
         key_record = get_api_key_by_id(app_id, key_id)
         if not key_record:
             raise HTTPException(status_code=404, detail="API key not found")
         
-        return {
-            "api_key": key_record["api_key"],
-            "id": key_record["id"],
-            "is_active": key_record.get("is_active", True)
-        }
+        delete_api_key(app_id, key_id)
+        return None
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/app/{app_id}/api-key/{key_id}/regenerate")
-def regenerate_api_key(app_id: str, key_id: str):
-    """Regenerate API key"""
-    try:
-        # Get existing key info
-        existing_key = get_api_key_by_id(app_id, key_id)
-        if not existing_key:
-            raise HTTPException(status_code=404, detail="API key not found")
-        
-        # Generate new key
-        alphabet = string.ascii_letters + string.digits + "_-"
-        new_api_key = ''.join(secrets.choice(alphabet) for _ in range(32))
-        
-        # Update key record
-        updated_record = {
-            **existing_key,
-            "api_key": new_api_key,
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "last_used_at": None
-        }
-        
-        save_api_key(updated_record)
-        
-        return APIKeyResponse(
-            id=updated_record["id"],
-            api_key=new_api_key,
-            name=updated_record.get("name"),
-            created_at=updated_record["created_at"],
-            expires_at=updated_record.get("expires_at"),
-            is_active=updated_record.get("is_active", True)
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Failed to revoke API key: {str(e)}")
 
 
 

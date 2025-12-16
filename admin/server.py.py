@@ -413,6 +413,51 @@ async def get_application(app_id: str):
         raise HTTPException(status_code=500, detail=f"Failed to get application: {str(e)}")
 
 
+@app.put("/app/{app_id}", response_model=ApplicationResponse)
+async def update_application(app_id: str, app_data: ApplicationCreate):
+    """Update an existing application"""
+    try:
+        applications_table = dynamodb.Table(APPLICATIONS_TABLE)
+
+        # Check if application exists
+        response = applications_table.get_item(Key={"id": app_id})
+        if "Item" not in response:
+            raise HTTPException(status_code=404, detail="Application not found")
+
+        # Update the application
+        now = datetime.now(timezone.utc)
+        
+        applications_table.update_item(
+            Key={"id": app_id},
+            UpdateExpression="SET #name = :name, application_id = :app_id, email = :email, domain = :domain, updated_at = :updated_at",
+            ExpressionAttributeNames={
+                "#name": "name"  # 'name' is a reserved word in DynamoDB
+            },
+            ExpressionAttributeValues={
+                ":name": app_data.App_name,
+                ":app_id": app_data.Application,
+                ":email": app_data.Email,
+                ":domain": app_data.Domain,
+                ":updated_at": datetime_to_str(now)
+            }
+        )
+
+        # Return updated application
+        return ApplicationResponse(
+            id=app_id,
+            name=app_data.App_name,
+            application_id=app_data.Application,
+            email=app_data.Email,
+            domain=app_data.Domain,
+            created_at=str_to_datetime(response["Item"]["created_at"]),
+            updated_at=now
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update application: {str(e)}")
+
+
 @app.delete("/app/{app_id}", status_code=204)
 async def delete_application(app_id: str):
     """Delete an application and all its API keys"""
