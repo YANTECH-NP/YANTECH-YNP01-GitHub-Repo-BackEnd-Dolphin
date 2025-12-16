@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: notification-platform-backend
+    ports:
+      - "80:8001"
+    environment:
+      # AWS DynamoDB configuration
+      AWS_REGION: us-east-1
+      APPLICATIONS_TABLE: YANTECH-YNP01-AWS-DYNAMODB-APPLICATIONS-DEV
+      API_KEYS_TABLE: YANTECH-YNP01-AWS-DYNAMODB-API-KEYS-DEV
+      
+      # CORS configuration - update with your frontend URLs
+      ALLOWED_ORIGINS: "https://yantech-ynp456-frontend-dolphin.s3.amazonaws.com"
+      
+    volumes:
+      # Mount code for development (optional - comment out for production)
+      # - .:/app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  data:
+    driver: local
+
