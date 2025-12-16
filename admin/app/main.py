@@ -91,13 +91,17 @@ async def create_application(app_data: ApplicationCreate):
         app_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         
-        # Create application record matching server.py format
+        # Create application record using existing database schema
         app_record = {
-            "id": app_id,
-            "name": app_data.App_name,
-            "application_id": app_data.Application,
-            "email": app_data.Email,
-            "domain": app_data.Domain,
+            "Application": app_data.Application,  # Primary key for DynamoDB
+            "App_name": app_data.App_name,
+            "Email": app_data.Email,
+            "Domain": app_data.Domain,
+            "id": app_id,  # Additional UUID for response
+            "name": app_data.App_name,  # For server.py compatibility
+            "application_id": app_data.Application,  # For server.py compatibility
+            "email": app_data.Email,  # For server.py compatibility
+            "domain": app_data.Domain,  # For server.py compatibility
             "created_at": now.isoformat(),
             "updated_at": now.isoformat()
         }
