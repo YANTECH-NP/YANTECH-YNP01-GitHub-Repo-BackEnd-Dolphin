@@ -331,6 +331,8 @@ async def create_application(app_data: ApplicationCreate):
             "application_id": app_data.Application,
             "email": app_data.Email,
             "domain": app_data.Domain,
+            "role": "client",  # Set role for Lambda authorizer
+            "status": "ACTIVE",  # Set status
             "created_at": datetime_to_str(now),
             "updated_at": datetime_to_str(now)
         }

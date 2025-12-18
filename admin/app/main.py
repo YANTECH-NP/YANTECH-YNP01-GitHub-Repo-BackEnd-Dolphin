@@ -97,6 +97,8 @@ async def create_application(app_data: ApplicationCreate):
             "App_name": app_data.App_name,
             "Email": app_data.Email,
             "Domain": app_data.Domain,
+            "role": "client",  # Set role for Lambda authorizer
+            "Status": "ACTIVE",  # Set status
             "id": app_id,  # Additional UUID for response
             "name": app_data.App_name,  # For server.py compatibility
             "application_id": app_data.Application,  # For server.py compatibility
