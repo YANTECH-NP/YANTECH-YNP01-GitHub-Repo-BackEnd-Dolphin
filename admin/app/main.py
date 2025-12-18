@@ -248,7 +248,7 @@ async def generate_api_key(app_id: str, key_data: APIKeyCreate = APIKeyCreate())
         now = datetime.now(timezone.utc)
         
         api_key_record = {
-            "app_id": app_id,
+            "app_id": app.get('Application', app.get('application_id', app_id)),  # Use Application field for Lambda lookup
             "id": key_id,
             "api_key": api_key,
             "name": key_data.name or f"API Key for {app.get('name', app.get('App_name', 'Application'))}",

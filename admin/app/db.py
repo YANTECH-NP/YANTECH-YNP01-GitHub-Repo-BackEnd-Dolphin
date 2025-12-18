@@ -84,11 +84,20 @@ def get_api_keys_for_app(app_id: str) -> List[Dict[str, Any]]:
         raise ValueError("app_id must be a non-empty string")
     
     try:
+        # First get the application to find the correct application_id
+        apps = get_all_apps()
+        app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        if not app:
+            return []
+        
+        # Use Application field for API key lookup
+        app_application_id = app.get("Application", app_id)
+        
         table = get_dynamodb_resource().Table(settings.API_KEYS_TABLE)
         response = table.query(
             KeyConditionExpression="app_id = :app_id",
             ExpressionAttributeValues={
-                ":app_id": app_id
+                ":app_id": app_application_id
             }
         )
         return response.get("Items", [])
@@ -103,8 +112,17 @@ def get_api_key_by_id(app_id: str, key_id: str) -> Optional[Dict[str, Any]]:
         raise ValueError("key_id must be a non-empty string")
     
     try:
+        # First get the application to find the correct application_id
+        apps = get_all_apps()
+        app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        if not app:
+            return None
+        
+        # Use Application field for API key lookup
+        app_application_id = app.get("Application", app_id)
+        
         table = get_dynamodb_resource().Table(settings.API_KEYS_TABLE)
-        response = table.get_item(Key={"app_id": app_id, "id": key_id})
+        response = table.get_item(Key={"app_id": app_application_id, "id": key_id})
         return response.get("Item")
     except Exception as e:
         raise RuntimeError(f"Failed to retrieve API key: {str(e)}")
@@ -117,7 +135,16 @@ def delete_api_key(app_id: str, key_id: str) -> None:
         raise ValueError("key_id must be a non-empty string")
     
     try:
+        # First get the application to find the correct application_id
+        apps = get_all_apps()
+        app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        if not app:
+            raise RuntimeError("Application not found")
+        
+        # Use Application field for API key lookup
+        app_application_id = app.get("Application", app_id)
+        
         table = get_dynamodb_resource().Table(settings.API_KEYS_TABLE)
-        table.delete_item(Key={"app_id": app_id, "id": key_id})
+        table.delete_item(Key={"app_id": app_application_id, "id": key_id})
     except Exception as e:
         raise RuntimeError(f"Failed to delete API key: {str(e)}")

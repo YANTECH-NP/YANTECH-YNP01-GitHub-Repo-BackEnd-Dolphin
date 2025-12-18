@@ -472,15 +472,16 @@ async def delete_application(app_id: str):
         if "Item" not in response:
             raise HTTPException(status_code=404, detail="Application not found")
 
-        # Delete all API keys for this application
+        # Delete all API keys for this application using application_id
+        app_application_id = response["Item"].get("application_id", app_id)
         keys_response = api_keys_table.query(
             KeyConditionExpression="app_id = :aid",
-            ExpressionAttributeValues={":aid": app_id}
+            ExpressionAttributeValues={":aid": app_application_id}
         )
 
         for key in keys_response.get("Items", []):
             api_keys_table.delete_item(
-                Key={"app_id": app_id, "id": key["id"]}
+                Key={"app_id": app_application_id, "id": key["id"]}
             )
 
         # Delete the application
@@ -516,7 +517,7 @@ async def generate_api_key(
 
         # Store hashed version in database
         item = {
-            "app_id": app_id,
+            "app_id": app.get("application_id", app_id),  # Use application_id field for Lambda lookup
             "id": key_id,
             "key_hash": hash_api_key(api_key),
             "name": key_data.name or f"API Key for {app['name']}",
@@ -554,10 +555,11 @@ async def list_api_keys(app_id: str):
         if "Item" not in app_response:
             raise HTTPException(status_code=404, detail="Application not found")
 
-        # Query all API keys for this application
+        # Query all API keys for this application using application_id
+        app_application_id = app_response["Item"].get("application_id", app_id)
         response = api_keys_table.query(
             KeyConditionExpression="app_id = :aid",
-            ExpressionAttributeValues={":aid": app_id}
+            ExpressionAttributeValues={":aid": app_application_id}
         )
 
         keys = []
@@ -584,9 +586,17 @@ async def revoke_api_key(app_id: str, key_id: str):
     try:
         api_keys_table = dynamodb.Table(API_KEYS_TABLE)
 
+        # Get application to find correct app_id
+        applications_table = dynamodb.Table(APPLICATIONS_TABLE)
+        app_response = applications_table.get_item(Key={"id": app_id})
+        if "Item" not in app_response:
+            raise HTTPException(status_code=404, detail="Application not found")
+        
+        app_application_id = app_response["Item"].get("application_id", app_id)
+        
         # Get the key to verify it exists
         response = api_keys_table.get_item(
-            Key={"app_id": app_id, "id": key_id}
+            Key={"app_id": app_application_id, "id": key_id}
         )
 
         if "Item" not in response:
@@ -594,7 +604,7 @@ async def revoke_api_key(app_id: str, key_id: str):
 
         # Update is_active to False
         api_keys_table.update_item(
-            Key={"app_id": app_id, "id": key_id},
+            Key={"app_id": app_application_id, "id": key_id},
             UpdateExpression="SET is_active = :ia",
             ExpressionAttributeValues={":ia": False}
         )
