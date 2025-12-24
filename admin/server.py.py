@@ -316,7 +316,7 @@ async def health_check():
 
 
 @app.post("/app", response_model=ApplicationResponse, status_code=201)
-async def create_application(app_data: ApplicationCreate):
+async def create_application(app_data: ApplicationCreate, key_record: Dict[str, Any] = Depends(require_api_key)):
     """Create a new application"""
     try:
         applications_table = dynamodb.Table(APPLICATIONS_TABLE)
@@ -354,7 +354,7 @@ async def create_application(app_data: ApplicationCreate):
 
 
 @app.get("/apps", response_model=List[ApplicationResponse])
-async def list_applications(skip: int = 0, limit: int = 100):
+async def list_applications(skip: int = 0, limit: int = 100, key_record: Dict[str, Any] = Depends(require_api_key)):
     print(f"[DEBUG] Received GET /apps with skip={skip}, limit={limit}")
 
     try:
@@ -389,7 +389,7 @@ async def list_applications(skip: int = 0, limit: int = 100):
 
 
 @app.get("/app/{app_id}", response_model=ApplicationResponse)
-async def get_application(app_id: str):
+async def get_application(app_id: str, key_record: Dict[str, Any] = Depends(require_api_key)):
     """Get a specific application"""
     try:
         applications_table = dynamodb.Table(APPLICATIONS_TABLE)
@@ -416,7 +416,7 @@ async def get_application(app_id: str):
 
 
 @app.put("/app/{app_id}", response_model=ApplicationResponse)
-async def update_application(app_id: str, app_data: ApplicationCreate):
+async def update_application(app_id: str, app_data: ApplicationCreate, key_record: Dict[str, Any] = Depends(require_api_key)):
     """Update an existing application"""
     try:
         applications_table = dynamodb.Table(APPLICATIONS_TABLE)
@@ -461,7 +461,7 @@ async def update_application(app_id: str, app_data: ApplicationCreate):
 
 
 @app.delete("/app/{app_id}", status_code=204)
-async def delete_application(app_id: str):
+async def delete_application(app_id: str, key_record: Dict[str, Any] = Depends(require_api_key)):
     """Delete an application and all its API keys"""
     try:
         applications_table = dynamodb.Table(APPLICATIONS_TABLE)
@@ -497,7 +497,8 @@ async def delete_application(app_id: str):
 @app.post("/app/{app_id}/api-key", response_model=APIKeyResponse, status_code=201)
 async def generate_api_key(
     app_id: str,
-    key_data: APIKeyCreate = APIKeyCreate()
+    key_data: APIKeyCreate = APIKeyCreate(),
+    key_record: Dict[str, Any] = Depends(require_api_key)
 ):
     """Generate a new API key for an application"""
     try:
@@ -544,7 +545,7 @@ async def generate_api_key(
 
 
 @app.get("/app/{app_id}/api-keys", response_model=List[APIKeyInfo])
-async def list_api_keys(app_id: str):
+async def list_api_keys(app_id: str, key_record: Dict[str, Any] = Depends(require_api_key)):
     """List all API keys for an application (without showing the actual keys)"""
     try:
         applications_table = dynamodb.Table(APPLICATIONS_TABLE)
@@ -581,7 +582,7 @@ async def list_api_keys(app_id: str):
 
 
 @app.delete("/app/{app_id}/api-key/{key_id}", status_code=204)
-async def revoke_api_key(app_id: str, key_id: str):
+async def revoke_api_key(app_id: str, key_id: str, key_record: Dict[str, Any] = Depends(require_api_key)):
     """Revoke (deactivate) an API key"""
     try:
         api_keys_table = dynamodb.Table(API_KEYS_TABLE)
@@ -627,7 +628,7 @@ async def protected_route(key_record: Dict[str, Any] = Depends(require_api_key))
 
 
 @app.post("/verify-key")
-async def verify_key(x_api_key: str = Header(...)):
+async def verify_key(x_api_key: str = Header(...), key_record: Dict[str, Any] = Depends(require_api_key)):
     """Verify if an API key is valid"""
     key_record = verify_api_key(x_api_key)
     if not key_record:
