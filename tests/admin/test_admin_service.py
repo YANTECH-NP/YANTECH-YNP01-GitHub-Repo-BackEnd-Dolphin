@@ -30,13 +30,17 @@ def test_root_endpoint(client):
 
 @pytest.mark.unit
 @patch('admin.server.dynamodb')
-def test_create_application(mock_dynamodb, client, sample_application):
+@patch('admin.server.verify_api_key')
+def test_create_application(mock_verify_api_key, mock_dynamodb, client, sample_application):
     """Test application creation."""
+    # Mock API key verification
+    mock_verify_api_key.return_value = {"app_id": "admin-app", "name": "Admin Key"}
+    
     # Mock DynamoDB table
     mock_table = MagicMock()
     mock_dynamodb.Table.return_value = mock_table
     
-    response = client.post("/app", json=sample_application)
+    response = client.post("/app", json=sample_application, headers={"X-API-Key": "test-admin-key"})
     assert response.status_code == 201
     
     data = response.json()
@@ -49,8 +53,12 @@ def test_create_application(mock_dynamodb, client, sample_application):
 
 @pytest.mark.unit
 @patch('admin.server.dynamodb')
-def test_list_applications(mock_dynamodb, client):
+@patch('admin.server.verify_api_key')
+def test_list_applications(mock_verify_api_key, mock_dynamodb, client):
     """Test listing applications."""
+    # Mock API key verification
+    mock_verify_api_key.return_value = {"app_id": "admin-app", "name": "Admin Key"}
+    
     # Mock DynamoDB response
     mock_table = MagicMock()
     mock_table.scan.return_value = {
@@ -66,7 +74,7 @@ def test_list_applications(mock_dynamodb, client):
     }
     mock_dynamodb.Table.return_value = mock_table
     
-    response = client.get("/apps")
+    response = client.get("/apps", headers={"X-API-Key": "test-admin-key"})
     assert response.status_code == 200
     
     data = response.json()
@@ -75,8 +83,12 @@ def test_list_applications(mock_dynamodb, client):
 
 @pytest.mark.unit
 @patch('admin.server.dynamodb')
-def test_generate_api_key(mock_dynamodb, client):
+@patch('admin.server.verify_api_key')
+def test_generate_api_key(mock_verify_api_key, mock_dynamodb, client):
     """Test API key generation."""
+    # Mock API key verification
+    mock_verify_api_key.return_value = {"app_id": "admin-app", "name": "Admin Key"}
+    
     # Mock application exists
     mock_apps_table = MagicMock()
     mock_apps_table.get_item.return_value = {
@@ -92,7 +104,7 @@ def test_generate_api_key(mock_dynamodb, client):
     
     mock_dynamodb.Table.side_effect = table_side_effect
     
-    response = client.post("/app/test-app/api-key", json={"name": "Test Key"})
+    response = client.post("/app/test-app/api-key", json={"name": "Test Key"}, headers={"X-API-Key": "test-admin-key"})
     assert response.status_code == 201
     
     data = response.json()
@@ -105,8 +117,12 @@ def test_generate_api_key(mock_dynamodb, client):
 
 @pytest.mark.regression
 @patch('admin.server.dynamodb')
-def test_api_key_format_consistency(mock_dynamodb, client):
+@patch('admin.server.verify_api_key')
+def test_api_key_format_consistency(mock_verify_api_key, mock_dynamodb, client):
     """Regression test: Ensure API key format remains consistent."""
+    # Mock API key verification
+    mock_verify_api_key.return_value = {"app_id": "admin-app", "name": "Admin Key"}
+    
     # Mock application exists
     mock_apps_table = MagicMock()
     mock_apps_table.get_item.return_value = {
@@ -122,7 +138,7 @@ def test_api_key_format_consistency(mock_dynamodb, client):
     
     mock_dynamodb.Table.side_effect = table_side_effect
     
-    response = client.post("/app/test-app/api-key")
+    response = client.post("/app/test-app/api-key", headers={"X-API-Key": "test-admin-key"})
     assert response.status_code == 201
     
     data = response.json()
