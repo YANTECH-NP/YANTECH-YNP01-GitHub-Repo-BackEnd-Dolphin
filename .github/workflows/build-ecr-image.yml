@@ -197,12 +197,36 @@ jobs:
         path: trivy-reports/
         retention-days: 30
     
-    # Upload SARIF results to GitHub Security tab
+    # Upload SARIF results to GitHub Security tab (separate uploads for each service)
     - name: Upload Trivy SARIF results
       if: always()
-      uses: github/codeql-action/upload-sarif@v3
+      run: |
+        for SERVICE in $SERVICES; do
+          if [ -f "trivy-reports/$SERVICE-scan.sarif" ]; then
+            echo "Uploading SARIF for $SERVICE..."
+          fi
+        done
+    
+    - name: Upload Admin SARIF
+      if: always() && hashFiles('trivy-reports/admin-scan.sarif') != ''
+      uses: github/codeql-action/upload-sarif@v4
       with:
-        sarif_file: trivy-reports/
+        sarif_file: trivy-reports/admin-scan.sarif
+        category: trivy-admin
+    
+    - name: Upload Requestor SARIF
+      if: always() && hashFiles('trivy-reports/requestor-scan.sarif') != ''
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: trivy-reports/requestor-scan.sarif
+        category: trivy-requestor
+    
+    - name: Upload Worker SARIF
+      if: always() && hashFiles('trivy-reports/worker-scan.sarif') != ''
+      uses: github/codeql-action/upload-sarif@v4
+      with:
+        sarif_file: trivy-reports/worker-scan.sarif
+        category: trivy-worker
     
     # Check for critical vulnerabilities and fail if found
     - name: Check vulnerability scan results
