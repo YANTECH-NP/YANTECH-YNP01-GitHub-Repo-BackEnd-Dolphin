@@ -50,11 +50,15 @@ def delete_app_record(app_id: str) -> None:
         raise ValueError("app_id must be a non-empty string")
     
     try:
-        # First get the application to find the correct Application field (primary key)
+        # First try to get the application to find the correct Application field (primary key)
         apps = get_all_apps()
         app = next((app for app in apps if app.get("id") == app_id or app.get("Application") == app_id), None)
+        
         if not app:
-            raise RuntimeError(f"Application not found: {app_id}")
+            # If not found by id or Application, try using app_id directly as the key
+            table = get_dynamodb_resource().Table(settings.APP_CONFIG_TABLE)
+            table.delete_item(Key={"Application": app_id})
+            return
         
         # Use Application field as the primary key for deletion
         app_application_id = app.get("Application", app_id)
