@@ -31,13 +31,18 @@ def log_request(application_id: str, request_data: Any, status: str, error: Opti
     
     try:
         table = dynamodb.Table(config.REQUEST_LOG_TABLE)
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        # Extract payload details
+        payload = request_data if isinstance(request_data, dict) else {}
+        
         table.put_item(Item={
-            "RecordID": str(uuid.uuid4()),
             "Application": str(application_id),
-            "Timestamp": datetime.now(timezone.utc).isoformat(),
-            "Status": str(status),
-            "Error": str(error) if error else "None",
-            "Request": str(request_data) if request_data else "",
+            "Timestamp": timestamp,
+            "Status": str(status).upper(),
+            "Payload": payload,
+            "Error": str(error) if error else None,
+            "ExpirationTime": int((datetime.now(timezone.utc).timestamp() + 7776000))  # 90 days TTL
         })
     except Exception as e:
         raise RuntimeError(f"Failed to log request: {str(e)}")
