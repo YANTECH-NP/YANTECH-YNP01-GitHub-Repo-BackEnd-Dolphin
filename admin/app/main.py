@@ -346,20 +346,16 @@ async def get_notification_stats(
 ):
     """Get notification statistics"""
     try:
-        # Get metrics table
-        metrics_table_name = settings.AWS_ACCOUNT_ID and f"YANTECH-YNP01-AWS-DYNAMODB-NOTIFICATION-METRICS-DEV" or "NotificationMetrics"
-        request_log_table_name = settings.AWS_ACCOUNT_ID and f"YANTECH-YNP01-AWS-DYNAMODB-REQUEST-LOG-DEV" or "RequestLog"
-        
         dynamodb = get_dynamodb_resource()
         
         # Try metrics table first, fallback to request log
         try:
-            metrics_table = dynamodb.Table(metrics_table_name)
+            metrics_table = dynamodb.Table(settings.NOTIFICATION_METRICS_TABLE)
             response = metrics_table.scan(Limit=1000)
             items = response.get("Items", [])
         except:
             # Fallback to request log table
-            request_log_table = dynamodb.Table(request_log_table_name)
+            request_log_table = dynamodb.Table(settings.REQUEST_LOG_TABLE)
             response = request_log_table.scan(Limit=1000)
             items = response.get("Items", [])
         
@@ -438,10 +434,9 @@ async def get_recent_notifications(
     """Get recent notification activity"""
     try:
         limit = min(limit, 100)
-        request_log_table_name = settings.AWS_ACCOUNT_ID and f"YANTECH-YNP01-AWS-DYNAMODB-REQUEST-LOG-DEV" or "RequestLog"
         
         dynamodb = get_dynamodb_resource()
-        logs_table = dynamodb.Table(request_log_table_name)
+        logs_table = dynamodb.Table(settings.REQUEST_LOG_TABLE)
         
         response = logs_table.scan(Limit=limit * 3)
         items = response.get("Items", [])
