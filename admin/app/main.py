@@ -383,9 +383,24 @@ async def get_notification_stats(
                 continue
             
             count = int(item.get("count", 1))
-            status = item.get("Status", item.get("status", "DELIVERED")).upper()
-            channel = item.get("channel", item.get("Payload", {}).get("OutputType", "EMAIL")).upper()
-            metric_date = item.get("metric_date", item.get("Timestamp", "")[:10])
+            status = item.get("Status", "DELIVERED")
+            if isinstance(status, str):
+                status = status.upper()
+            else:
+                status = "DELIVERED"
+            
+            # Extract channel from Payload
+            payload = item.get("Payload", {})
+            if isinstance(payload, dict):
+                channel = payload.get("OutputType", "EMAIL")
+                if isinstance(channel, str):
+                    channel = channel.upper()
+                else:
+                    channel = "EMAIL"
+            else:
+                channel = "EMAIL"
+            
+            metric_date = item.get("Timestamp", "")[:10]
             
             total += count
             
