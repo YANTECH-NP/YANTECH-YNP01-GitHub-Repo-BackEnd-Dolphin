@@ -347,17 +347,9 @@ async def get_notification_stats(
     """Get notification statistics"""
     try:
         dynamodb = get_dynamodb_resource()
-        
-        # Try metrics table first, fallback to request log
-        try:
-            metrics_table = dynamodb.Table(settings.NOTIFICATION_METRICS_TABLE)
-            response = metrics_table.scan(Limit=1000)
-            items = response.get("Items", [])
-        except:
-            # Fallback to request log table
-            request_log_table = dynamodb.Table(settings.REQUEST_LOG_TABLE)
-            response = request_log_table.scan(Limit=1000)
-            items = response.get("Items", [])
+        request_log_table = dynamodb.Table(settings.REQUEST_LOG_TABLE)
+        response = request_log_table.scan(Limit=1000)
+        items = response.get("Items", [])
         
         # Initialize counters
         total = 0
