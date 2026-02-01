@@ -383,20 +383,9 @@ async def get_notification_stats(
                 continue
             
             count = int(item.get("count", 1))
-            status = item.get("Status", item.get("status", "delivered")).upper()
-            # Parse Request field if it's a string
-            request_str = item.get("Request", "{}")
-            if isinstance(request_str, str):
-                import ast
-                try:
-                    request_data = ast.literal_eval(request_str)
-                except:
-                    request_data = {}
-            else:
-                request_data = request_str
-            
-            channel = request_data.get("OutputType", "EMAIL").upper()
-            metric_date = item.get("Timestamp", "")[:10]
+            status = item.get("Status", item.get("status", "DELIVERED")).upper()
+            channel = item.get("channel", item.get("Payload", {}).get("OutputType", "EMAIL")).upper()
+            metric_date = item.get("metric_date", item.get("Timestamp", "")[:10])
             
             total += count
             
@@ -459,17 +448,7 @@ async def get_recent_notifications(
         
         recent_activities = []
         for item in items:
-            # Parse Request field
-            request_str = item.get("Request", "{}")
-            if isinstance(request_str, str):
-                import ast
-                try:
-                    payload = ast.literal_eval(request_str)
-                except:
-                    payload = {}
-            else:
-                payload = request_str
-            
+            payload = item.get("Payload", {})
             status = item.get("Status", "PENDING").upper()
             app_id = item.get("Application", "")
             
