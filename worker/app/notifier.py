@@ -18,7 +18,7 @@ def send_email(domain_arn: str, to_addresses: List[str], subject: str, body: str
     if not body or not isinstance(body, str):
         raise ValueError("body must be a non-empty string")
     
-    sender_email = "notifications@project-panther.com"
+    sender_email = "notifications@project-dolphin.com"
     logger.log(f"[SES] Sending email from {sender_email} to {to_addresses}")
     
     try:
