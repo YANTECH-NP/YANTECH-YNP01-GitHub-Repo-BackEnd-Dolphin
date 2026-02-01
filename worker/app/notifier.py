@@ -121,7 +121,7 @@ https://project-panther.com
                 }
             },
             ReturnPath=sender_email,
-            ReplyToAddresses=["support@project-panther.com"],
+            ReplyToAddresses=["support@project-dolphin.com"],
             Tags=[
                 {"Name": "Environment", "Value": "production"},
                 {"Name": "Service", "Value": "notification-worker"},
